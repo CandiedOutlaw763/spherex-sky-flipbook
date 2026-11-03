@@ -4,6 +4,25 @@ A public web tool for the 2026 NASA Space Apps challenge **Planet X and SPHEREx*
 coordinates, and it plays every SPHEREx image of that patch of sky as a little video so anything
 that moves or changes brightness stands out.
 
+**Live:** <https://spherex-sky-flipbook.vercel.app>
+
+## How to use it
+
+1. **Pick a target:** click one of the **Try** buttons (the challenge's five test targets), or type a
+   name or RA/Dec into the search box and press **Show sky**. A new field takes up to a few minutes the
+   first time; after that it loads in seconds.
+2. **Watch it play:** space bar to play or pause, arrow keys to step, or drag along the timeline. The
+   amber cross-hair marks where the target should be on each date.
+3. **Spot movers:** set **Compare** to *Subtract the median of all frames*. Anything that stays put
+   disappears, and moving stars leave a bright/dark pair.
+4. **Measure:** scroll below the image for the target's spectrum and brightness over time, or click
+   anywhere on the image to measure that spot.
+5. **Compare with other telescopes:** tick **Gaia DR3** or **CatWISE2020** to mark known stars.
+6. **Share:** **Copy link to this view** saves the current target and settings in a URL.
+
+The **[user guide](docs/USER_GUIDE.md)** covers every control, a suggested demo path, where the data
+comes from and the known limits.
+
 ## What it does
 
 - **Any position.** Enter RA/Dec (decimal or sexagesimal) or an object name. Fields are 2′–15′ across.
