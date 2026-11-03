@@ -28,6 +28,7 @@ _FALLBACK_COLLECTIONS = ["spherex_qr2", "spherex_qr3"]
 _COLLECTIONS_TTL = 6 * 3600
 _SEARCH_TTL = 6 * 3600  # IRSA searches take 20-70 s, and releases land at most weekly
 _PARTIAL_SEARCH_TTL = 15 * 60  # results missing a collection are retried sooner
+_SIA_BUDGET = 90  # seconds per collection; a slow one is dropped (and retried later) rather than stall the field
 
 _collections: tuple[float, list[str]] = (0.0, [])
 
@@ -67,7 +68,7 @@ async def list_collections(client: httpx.AsyncClient) -> list[str]:
         return names
     query = "SELECT DISTINCT obs_collection FROM ivoa.obscore WHERE obs_collection LIKE 'spherex%'"
     try:
-        r = await client.get(f"{IRSA}/TAP/sync", params={"QUERY": query, "FORMAT": "csv"}, timeout=120)
+        r = await client.get(f"{IRSA}/TAP/sync", params={"QUERY": query, "FORMAT": "csv"}, timeout=45)
         r.raise_for_status()
         rows = csv.DictReader(io.StringIO(r.text))
         names = sorted(n for row in rows if _SCIENCE_COLLECTION.match(n := row["obs_collection"]))
@@ -142,7 +143,8 @@ _background: set[asyncio.Task] = set()
 async def _search_irsa(client: httpx.AsyncClient, ra: float, dec: float, cache_key: str) -> list[ImageRecord]:
     collections = await list_collections(client)
     results = await asyncio.gather(
-        *(_search_collection(client, c, ra, dec) for c in collections), return_exceptions=True
+        *(asyncio.wait_for(_search_collection(client, c, ra, dec), _SIA_BUDGET) for c in collections),
+        return_exceptions=True,
     )
     by_key: dict[str, ImageRecord] = {}
     for collection, result in zip(collections, results):

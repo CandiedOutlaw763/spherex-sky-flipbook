@@ -52,6 +52,7 @@ class Cutout:
     image: np.ndarray  # MJy/sr, NaN where the exposure has no data
     flags: np.ndarray  # int32 bitmask from the FLAGS HDU, nearest input pixel
     flag_planes: dict[int, tuple[str, str]]
+    wave: np.ndarray | None = None  # see _wave_model; None if the wavelength table was unavailable
 
 
 def _input_wcs(header_text: str) -> WCS:
@@ -87,16 +88,47 @@ def _nearest(sub: np.ndarray, x: np.ndarray, y: np.ndarray) -> np.ndarray:
     return np.where(inside, sub[np.clip(yi, 0, h - 1), np.clip(xi, 0, w - 1)], 0).astype(np.int32)
 
 
+def _wave_model(grid: Grid, in_wcs: WCS, table: remote_fits.WaveTable) -> np.ndarray:
+    """[wavelength at the field centre, d(wavelength)/dx, d/dy per output pixel, bandwidth], in um.
+
+    The filter varies slowly across the detector, so a linear model is exact enough over a
+    cutout and lets the browser get the wavelength of any pixel without a per-pixel map.
+    """
+    c = (grid.size - 1) / 2
+    ra, dec = grid.wcs().all_pix2world([c, c + 1, c], [c, c, c + 1], 0)
+    x, y = in_wcs.all_world2pix(ra, dec, 0, quiet=True)
+    (w0, bw), (wx, _), (wy, _) = (table.at(x[i], y[i]) for i in range(3))
+    return np.array([w0, wx - w0, wy - w0, bw], dtype=np.float64)
+
+
+async def _wave_table_or_none(client, rec: ImageRecord):
+    try:
+        return await remote_fits.read_wave_table(client, rec.url, rec.detector)
+    except Exception as e:  # a spectrum is a bonus; never lose the image over it
+        log.warning("no wavelength table for %s: %r", rec.key, e)
+        return None
+
+
 async def make_cutout(client: httpx.AsyncClient, rec: ImageRecord, grid: Grid) -> Cutout | None:
     """Resampled cutout of `rec` on `grid`, or None if the exposure does not overlap it."""
     key = f"{rec.url}|{grid.ra:.6f}|{grid.dec:.6f}|{grid.size}|{grid.scale_arcsec}"
-    layout = await remote_fits.read_layout(client, rec.url)
+    layout, table = await asyncio.gather(remote_fits.read_layout(client, rec.url), _wave_table_or_none(client, rec))
     hit = cache.get_arrays("cutout", key)
     if hit is not None:
-        return Cutout(hit["image"], hit["flags"], layout.flag_planes) if hit["image"].size else None
+        if not hit["image"].size:
+            return None
+        wave = hit.get("wave")
+        if wave is None and table is not None:  # cached before spectra existed
+            wave = await asyncio.to_thread(lambda: _wave_model(grid, _input_wcs(layout.image_header), table))
+            cache.put_arrays("cutout", key, image=hit["image"], flags=hit["flags"], wave=wave)
+        return Cutout(hit["image"], hit["flags"], layout.flag_planes, wave)
 
     # WCS parsing and SIP inversion are the CPU-heavy part; keep them off the event loop.
-    x, y = await asyncio.to_thread(lambda: _sample_positions(grid, _input_wcs(layout.image_header)))
+    def plan():
+        in_wcs = _input_wcs(layout.image_header)
+        return *_sample_positions(grid, in_wcs), (_wave_model(grid, in_wcs, table) if table else None)
+
+    x, y, wave = await asyncio.to_thread(plan)
     ok = np.isfinite(x) & np.isfinite(y) & (x > -1) & (y > -1) & (x < layout.nx) & (y < layout.ny)
     if not ok.any():
         cache.put_arrays("cutout", key, image=np.empty(0, np.float32), flags=np.empty(0, np.int32))
@@ -113,5 +145,6 @@ async def make_cutout(client: httpx.AsyncClient, rec: ImageRecord, grid: Grid) -
     sx, sy = np.where(ok, x - x0, -10), np.where(ok, y - y0, -10)
     image = _bilinear(rows[:, x0:x1 + 1], sx, sy)
     flags = _nearest(flag_rows[:, x0:x1 + 1], sx, sy)
-    cache.put_arrays("cutout", key, image=image, flags=flags)
-    return Cutout(image, flags, layout.flag_planes)
+    extra = {"wave": wave} if wave is not None else {}
+    cache.put_arrays("cutout", key, image=image, flags=flags, **extra)
+    return Cutout(image, flags, layout.flag_planes, wave)

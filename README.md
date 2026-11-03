@@ -19,8 +19,20 @@ that moves or changes brightness stands out.
   star should be at each frame's date.
 - **Quality flags.** Pixels carrying SPHEREx's bad-data flags are hidden by default. Each frame
   lists its flag statistics and links to the original FITS files at IRSA.
+- **Spectra on the fly.** SPHEREx's filters vary across each detector, so every exposure samples a
+  slightly different wavelength. The tool reads each file's wavelength table, measures a 3×3-pixel
+  aperture in every exposure and plots flux against wavelength from 0.75 to 5 µm, coloured by date,
+  with a median spectrum and marked H₂O, CH₄, CO and CO₂ bands. It follows the target's expected track,
+  or measures any spot you click.
+- **Brightness over time.** The same measurements divided by the source's own median spectrum, in
+  three wavelength groups, with one median per flipbook frame. This shows variables changing even
+  though each exposure sees a different wavelength.
+- **Other telescopes.** Gaia DR3 and CatWISE2020 sources (from IRSA) can be drawn over the SPHEREx
+  frame, each moved to that frame's date along its proper motion. An Aladin Lite panel shows the same
+  field in AllWISE, 2MASS, Pan-STARRS or DSS.
 - **Shareable and embeddable.** The URL holds the view (`?target=barnard`, or
-  `?ra=133.7599&dec=-7.2422&fov=6&diff=median`), and `&embed=1` gives a bare viewer for iframes.
+  `?ra=133.7599&dec=-7.2422&fov=6&diff=median&cat=gaia`), and `&embed=1` gives a bare viewer for
+  iframes. Both charts download as CSV.
 - **New releases show up automatically.** Collections are discovered from IRSA's ObsCore table
   (`spherex_qr2`, `spherex_qr3`, ...), so QR4 and later need no code change.
 
@@ -38,6 +50,21 @@ The first look at a new field takes 30–90 s, because IRSA's image search is sl
 read from S3. Results are cached under `.cache/` (or set `SPHEREX_CACHE_DIR`), so repeat visits load in
 a second or two.
 
+## Deploy (Vercel)
+
+Live at <https://spherex-sky-flipbook.vercel.app>.
+
+The repo deploys to Vercel as-is: `public/` is served by the CDN, and `backend/app.py` (re-exported
+by the root `app.py`) runs as one Python function in `iad1`, the same AWS region as the SPHEREx S3
+bucket. Streams stop cleanly at 270 s, before the 300 s function limit, and the browser resumes
+them. On Vercel the cache lives in `/tmp`. `seed/` ships read-only cached data for the five test targets so
+they load instantly on a cold start; regenerate it with `scripts/build_seed.py` while the local
+server runs.
+
+```bash
+vercel deploy --prod
+```
+
 ## How it works
 
 ```
@@ -53,20 +80,25 @@ browser ──/api/cutouts (NDJSON stream)──► FastAPI ──SIA──► I
   from QR3 on.
 - `backend/spherex/cutout.py` resamples each exposure through its TAN-SIP WCS onto one shared north-up
   grid at the native 6.15″ pixel scale, so every frame lines up pixel for pixel.
-- `backend/spherex/resolve.py` resolves names with CDS Sesame and advances catalogue (J2000) positions
-  along their proper motion to 2026, the SPHEREx era. Barnard's Star has moved 4.5′ since 2000.
-- `frontend/` is plain ES modules with no build step. `frames.js` groups, stacks and subtracts,
-  `render.js` paints, and `main.js` handles the UI and URL state.
+- `backend/spherex/resolve.py` resolves names with CDS Sesame, falling back to NASA MAST plus a
+  Gaia/CatWISE proper-motion match, then NED. It advances catalogue (J2000) positions along their
+  proper motion to 2026, the SPHEREx era: Barnard's Star has moved 4.5′ since 2000.
+- `backend/spherex/catalogs.py` queries Gaia DR3 and CatWISE2020 cones from IRSA TAP.
+- `public/` is plain ES modules with no build step. `frames.js` groups, stacks and subtracts,
+  `render.js` paints, `analysis.js` and `charts.js` measure and plot, `context.js` handles the
+  catalogue overlays and Aladin Lite, and `main.js` runs the UI and URL state.
 
 ## API
 
 | Endpoint | Returns |
 |---|---|
-| `GET /api/cutouts?ra=&dec=&fov=&detectors=123456` | NDJSON: one `meta` line (grid), then a `cutout` line per exposure (base64 little-endian float32 image in MJy/sr and int32 flags), `flag_planes`, and `done` |
+| `GET /api/cutouts?ra=&dec=&fov=&detectors=123456` | NDJSON: one `meta` line (grid), then a `cutout` line per exposure (base64 little-endian float32 image in MJy/sr, int32 flags, and `wave`: wavelength at the field centre plus its per-pixel gradient), `flag_planes`, and `done` |
+| `GET /api/catalog?name=gaia\|catwise&ra=&dec=&radius=` | Catalogue sources with proper motions and the catalogue epoch |
 | `GET /api/images?ra=&dec=` | Metadata for every SPHEREx exposure covering the point |
 | `GET /api/resolve?name=` | Coordinates (J2000 and propagated) and proper motion |
 
 ## Data and credits
 
 SPHEREx quick-release Level 2 spectral images come from NASA/IPAC IRSA and its AWS Open Data mirror.
-Name resolution is by CDS Sesame (SIMBAD/NED/VizieR).
+Gaia DR3 (ESA/Gaia/DPAC) and CatWISE2020 come via IRSA. Names are resolved by CDS Sesame
+(SIMBAD/NED/VizieR), NASA MAST and NASA NED, and survey images come via Aladin Lite (CDS, Strasbourg).

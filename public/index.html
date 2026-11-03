@@ -76,6 +76,44 @@
         <p id="frame-label" class="mono"></p>
         <p id="hover" class="mono dim"></p>
       </div>
+
+      <section class="analysis" id="analysis" hidden aria-label="Measurements">
+        <div class="analysis-head">
+          <div>
+            <h3 id="probe-title">Measuring the target</h3>
+            <p id="probe-sub" class="dim">Click anywhere on the image to measure a different spot.</p>
+          </div>
+          <button id="probe-reset" type="button" hidden>Follow the target again</button>
+        </div>
+        <div class="charts">
+          <figure class="chart-card">
+            <figcaption>
+              <span><b>Spectrum</b> <span class="dim">every exposure, 3×3-pixel aperture</span></span>
+              <button type="button" class="csv" data-chart="spectrum" title="Download the points as CSV">CSV</button>
+            </figcaption>
+            <div id="spectrum-chart" class="chart"></div>
+            <div id="spectrum-legend" class="legend"></div>
+          </figure>
+          <figure class="chart-card">
+            <figcaption>
+              <span><b>Brightness over time</b> <span class="dim">relative to its typical spectrum</span></span>
+              <button type="button" class="csv" data-chart="lightcurve" title="Download the points as CSV">CSV</button>
+            </figcaption>
+            <div id="lightcurve-chart" class="chart"></div>
+            <div id="lightcurve-legend" class="legend"></div>
+          </figure>
+        </div>
+      </section>
+
+      <details class="context" id="context">
+        <summary>Same field in other surveys <span class="dim">(Aladin Lite)</span></summary>
+        <div class="context-bar">
+          <label class="visually-hidden" for="survey">Survey</label>
+          <select id="survey"></select>
+          <span id="context-status" class="mono dim"></span>
+        </div>
+        <div id="aladin" class="aladin"></div>
+      </details>
     </section>
 
     <aside class="controls" aria-label="Display controls">
@@ -107,6 +145,13 @@
           <option value="previous">Subtract the previous frame</option>
         </select>
         <p class="hint">Subtracting removes everything that stays put; whatever moved or changed brightness is left.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Other telescopes</legend>
+        <div id="catalog-toggles" class="catalogs"></div>
+        <p id="catalog-status" class="hint"></p>
+        <p class="hint">Catalogue stars are moved to each frame's date using their measured proper motions.</p>
       </fieldset>
 
       <fieldset>
