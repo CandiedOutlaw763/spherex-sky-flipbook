@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPHEREx Sky Flipbook</title>
+  <meta name="description" content="Blink through NASA SPHEREx infrared images of any patch of sky to spot moving and changing objects.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="top">
+    <div class="brand">
+      <span class="brand-mark" aria-hidden="true"></span>
+      <div>
+        <h1>SPHEREx Sky Flipbook</h1>
+        <p class="tagline">Blink NASA's infrared all-sky survey to find what moves.</p>
+      </div>
+    </div>
+    <form id="search" class="search" autocomplete="off">
+      <label class="visually-hidden" for="q">Object name or coordinates</label>
+      <input id="q" name="q" type="text" spellcheck="false"
+             placeholder="Object name, or RA Dec  e.g. 08h55m10.8s -07d14m42s">
+      <label class="visually-hidden" for="fov">Field of view</label>
+      <select id="fov" name="fov" title="Field of view">
+        <option value="2">2′</option>
+        <option value="4" selected>4′</option>
+        <option value="6">6′</option>
+        <option value="10">10′</option>
+        <option value="15">15′</option>
+      </select>
+      <button type="submit">Show sky</button>
+    </form>
+  </header>
+
+  <nav class="presets" aria-label="Test targets">
+    <span class="presets-label">Try</span>
+    <div id="presets" class="preset-list"></div>
+  </nav>
+
+  <main class="layout">
+    <section class="stage" aria-label="Image viewer">
+      <div class="stage-head">
+        <div>
+          <h2 id="target-name">Pick a target</h2>
+          <p id="target-coords" class="mono dim">Enter a name or coordinates above.</p>
+        </div>
+        <div id="status" class="status mono" role="status" aria-live="polite"></div>
+      </div>
+
+      <div class="viewer" id="viewer">
+        <canvas id="image" width="1" height="1" aria-label="SPHEREx image of the selected field"></canvas>
+        <canvas id="overlay" aria-hidden="true"></canvas>
+        <div id="empty" class="empty">
+          <p>No field loaded yet.</p>
+          <p class="dim">Choose a test target above to see SPHEREx data within seconds once cached.</p>
+        </div>
+        <div class="compass mono" aria-hidden="true"><span>↑ N</span><span>← E</span></div>
+        <div id="scalebar" class="scalebar mono" aria-hidden="true"></div>
+        <div id="progress" class="progress" hidden><div></div></div>
+      </div>
+
+      <div class="transport">
+        <button id="prev" type="button" title="Previous frame (←)" aria-label="Previous frame">◀</button>
+        <button id="play" type="button" title="Play / pause (space)" aria-label="Play">▶</button>
+        <button id="next" type="button" title="Next frame (→)" aria-label="Next frame">▶︎▏</button>
+        <div class="timeline" id="timeline" aria-label="Frames on a time axis"></div>
+        <label class="fps mono" title="Playback speed">
+          <input id="fps" type="range" min="1" max="12" value="3"> <span id="fps-out">3</span>/s
+        </label>
+      </div>
+
+      <div class="frame-info">
+        <p id="frame-label" class="mono"></p>
+        <p id="hover" class="mono dim"></p>
+      </div>
+    </section>
+
+    <aside class="controls" aria-label="Display controls">
+      <fieldset>
+        <legend>Frames</legend>
+        <div class="seg" role="radiogroup">
+          <label><input type="radio" name="mode" value="visit" checked><span>Survey visits</span></label>
+          <label><input type="radio" name="mode" value="exposure"><span>Single exposures</span></label>
+        </div>
+        <p class="hint">Visits stack every exposure from one pass of the survey (one every ~6 months). Single exposures show fast movers like asteroids.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Colour</legend>
+        <div class="seg" role="radiogroup">
+          <label><input type="radio" name="view" value="colour" checked><span>False colour</span></label>
+          <label><input type="radio" name="view" value="mono"><span>Mono</span></label>
+        </div>
+        <div id="detectors" class="detectors"></div>
+        <p class="hint">False colour maps short wavelengths to blue and long to red, so cool brown dwarfs glow red.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Compare</legend>
+        <select id="diff">
+          <option value="none">Show images as-is</option>
+          <option value="median">Subtract the median of all frames</option>
+          <option value="first">Subtract the first frame</option>
+          <option value="previous">Subtract the previous frame</option>
+        </select>
+        <p class="hint">Subtracting removes everything that stays put; whatever moved or changed brightness is left.</p>
+      </fieldset>
+
+      <fieldset>
+        <legend>Display</legend>
+        <label class="row">Stretch
+          <select id="stretch">
+            <option value="asinh" selected>asinh</option>
+            <option value="linear">linear</option>
+            <option value="log">log</option>
+          </select>
+        </label>
+        <label class="row">Contrast
+          <input id="clip" type="range" min="90" max="99.9" step="0.1" value="99.5">
+        </label>
+        <label class="check"><input id="mask" type="checkbox" checked> Hide flagged pixels</label>
+        <label class="check"><input id="invert" type="checkbox"> Invert (dark stars)</label>
+        <label class="check"><input id="track" type="checkbox" checked> Show expected position</label>
+      </fieldset>
+
+      <details id="frame-details">
+        <summary>This frame's data</summary>
+        <div id="flag-summary"></div>
+        <ul id="exposure-list" class="exposures mono"></ul>
+      </details>
+
+      <p class="share"><button id="copy-link" type="button">Copy link to this view</button></p>
+    </aside>
+  </main>
+
+  <footer class="foot dim">
+    Data: NASA SPHEREx quick-release Level 2 images via <a href="https://irsa.ipac.caltech.edu/Missions/spherex.html">NASA/IPAC IRSA</a>.
+    Built for the 2026 NASA Space Apps Challenge.
+  </footer>
+
+  <script type="module" src="js/main.js"></script>
+</body>
+</html>
