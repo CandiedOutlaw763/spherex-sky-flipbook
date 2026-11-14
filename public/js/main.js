@@ -208,6 +208,11 @@ async function load(target) {
   Object.assign(data, { grid: null, cutouts: [], planes: null, badMask: badMaskFromPlanes(null), total: 0, frames: [], shown: [], ranges: {}, catalogs: {} });
   els.analysis.hidden = true;
   els.catalogStatus.textContent = "";
+  // Blank the previous field right away so it never sits under the new target's name.
+  els.image.getContext("2d").clearRect(0, 0, els.image.width, els.image.height);
+  clearOverlay();
+  els.timeline.innerHTML = "";
+  els.frameLabel.textContent = "";
   for (const b of els.presets.children) b.setAttribute("aria-pressed", String(b.dataset.id === target.presetId));
   els.name.textContent = target.label;
   const pm = target.pmRa || target.pmDec ? ` · proper motion ${(Math.hypot(target.pmRa, target.pmDec) / 1000).toFixed(2)}″/yr` : "";
