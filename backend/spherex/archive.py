@@ -22,9 +22,10 @@ IRSA = "https://irsa.ipac.caltech.edu"
 IBE_PREFIX = f"{IRSA}/ibe/data/spherex/"
 S3_PREFIX = "https://nasa-irsa-spherex.s3.amazonaws.com/"
 
-# Science collections only: spherex_qr3, spherex_qr3_deep, ... but not the *_cal products.
-_SCIENCE_COLLECTION = re.compile(r"^spherex_qr\d+(_deep)?$")
-_FALLBACK_COLLECTIONS = ["spherex_qr2", "spherex_qr3"]
+# Level 2 science images from quick releases and data releases (spherex_qr3, spherex_dr1,
+# spherex_dr1_deep, ...), but not the *_cal calibration or *_cube spectral-cube products.
+_SCIENCE_COLLECTION = re.compile(r"^spherex_(qr|dr)\d+(_deep)?$")
+_FALLBACK_COLLECTIONS = ["spherex_dr1", "spherex_dr1_deep", "spherex_qr3", "spherex_qr3_deep"]
 _COLLECTIONS_TTL = 6 * 3600
 _SEARCH_TTL = 6 * 3600  # IRSA searches take 20-70 s, and releases land at most weekly
 _PARTIAL_SEARCH_TTL = 15 * 60  # results missing a collection are retried sooner

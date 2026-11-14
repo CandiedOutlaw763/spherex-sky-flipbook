@@ -144,7 +144,7 @@ from servers in Strasbourg (CDS); if those are unreachable the map stays grey.
 **All data is real.** Every image, spectrum point, brightness point and catalogue marker comes from
 NASA/ESA archives, fetched live or from cached copies of those fetches:
 
-- SPHEREx quick-release images: NASA/IPAC IRSA and its AWS Open Data mirror
+- SPHEREx Level 2 images (Quick Release 3 and Data Release 1): NASA/IPAC IRSA and its AWS Open Data mirror
 - Gaia DR3 and CatWISE2020: via IRSA
 - Name lookup: CDS Sesame, NASA MAST and NASA NED
 
