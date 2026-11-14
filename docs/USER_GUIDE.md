@@ -126,7 +126,8 @@ that spot instead; a cyan box marks it, and "Follow the target again" switches b
 
 The panel at the bottom opens an interactive sky map of the same position in AllWISE, 2MASS,
 Pan-STARRS or DSS, for comparison. You can drag and zoom it. It uses Aladin Lite, whose images come
-from servers in Strasbourg (CDS); if those are unreachable the map stays grey.
+mostly from servers in Strasbourg (CDS). If the survey you pick is unavailable, the panel switches to one
+that is working (DSS2 also has a mirror in Australia) and tells you which one it is showing.
 
 ## Suggested demo path
 

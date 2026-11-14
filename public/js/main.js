@@ -521,10 +521,30 @@ function ensureCatalogs() {
 function openContext() {
   const t = state.target;
   if (!t) { els.contextStatus.textContent = "Load a target first."; return; }
-  els.contextStatus.textContent = "Loading Aladin Lite…";
-  aladinView("#aladin", { ra: t.ra, dec: t.dec, fovDeg: Math.max(0.05, (state.fov / 60) * 1.6), survey: state.survey })
-    .then(() => { els.contextStatus.textContent = "Drag to pan, scroll to zoom. Centred on the same position."; })
-    .catch((e) => { els.contextStatus.textContent = `Couldn't load Aladin Lite (${e.message}).`; });
+  els.contextStatus.textContent = "Connecting to the survey image server…";
+  const view = { ra: t.ra, dec: t.dec, fovDeg: Math.max(0.05, (state.fov / 60) * 1.6) };
+  // Start with the chosen survey; if its servers are down, fall back to the others in order.
+  const order = [state.survey, ...SURVEYS.map((s) => s.id).filter((id) => id !== state.survey)];
+  (async () => {
+    let firstError = null;
+    for (const survey of order) {
+      try {
+        const host = await aladinView("#aladin", { ...view, survey });
+        const label = SURVEYS.find((s) => s.id === survey).label;
+        if (survey !== state.survey) {
+          els.survey.value = survey;
+          els.contextStatus.textContent = `${firstError.message.split(" images")[0]} is unavailable right now, so this shows ${label} (from ${host}).`;
+          state.survey = survey;
+        } else {
+          els.contextStatus.textContent = `Drag to pan, scroll to zoom. Images from ${host}.`;
+        }
+        return;
+      } catch (e) {
+        firstError ??= e;
+      }
+    }
+    els.contextStatus.textContent = "Survey images are unavailable right now because their servers aren't responding. Try again later.";
+  })();
 }
 
 function updateFrameInfo(frame) {
@@ -743,7 +763,10 @@ function wire() {
   els.flagSummary.closest("details").addEventListener("toggle", () => { const f = data.shown[state.index]; if (f) renderFrameDetails(f); });
   els.copyLink.addEventListener("click", async () => {
     try { await navigator.clipboard.writeText(viewUrl()); els.copyLink.textContent = "Link copied"; }
-    catch { prompt("Copy this link:", viewUrl()); }
+    catch {
+      // No clipboard access (e.g. inside an iframe): fall back to showing the link to copy by hand.
+      try { prompt("Copy this link:", viewUrl()); } catch { setStatus(`Link to this view: ${viewUrl()}`); }
+    }
     setTimeout(() => (els.copyLink.textContent = "Copy link to this view"), 1800);
   });
 

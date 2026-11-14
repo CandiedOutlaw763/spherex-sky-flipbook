@@ -252,8 +252,10 @@ docs/USER_GUIDE.md         full user guide
   points with each other, but it understates a star's total brightness.
 - **First looks are slow.** NASA's archive search takes 30–60 s, and very large fields can take a few
   minutes the first time.
-- **Some services are outside our control.** Name lookup and the Aladin panel depend on CDS in
-  Strasbourg; the tool falls back to NASA services for names, but the Aladin images need CDS.
+- **Some services are outside our control.** Name lookup and the comparison-survey images come mostly
+  from CDS in Strasbourg. Names fall back to NASA MAST and NED. The survey panel tries each mirror in
+  turn and, if the chosen survey is down, switches to one that works (DSS2 also has a mirror at CSIRO)
+  and says so.
 
 ## Credits
 

@@ -74,33 +74,54 @@ export function drawSources(ctx, placed, style, cell, size, dpr) {
 // ---------- Aladin Lite ----------
 
 const ALADIN_SRC = "https://cdn.jsdelivr.net/npm/aladin-lite@3.8.2/dist/aladin.js";
-// CDS HiPS IDs; Aladin resolves them to whichever CDS mirror answers. (IRSA mirrors these
-// surveys too, but without CORS headers, so a browser can't use them.)
+// Each survey's HiPS mirrors (from the CDS MocServer), tried in order. Full URLs rather than CDS
+// IDs, so the panel doesn't depend on ID resolution; IRSA's mirrors are left out because they
+// send no CORS headers, which browsers need.
 export const SURVEYS = [
-  { id: "CDS/P/allWISE/color", label: "AllWISE (3.4–22 µm)" },
-  { id: "CDS/P/2MASS/color", label: "2MASS (1.2–2.2 µm)" },
-  { id: "CDS/P/PanSTARRS/DR1/color-z-zg-g", label: "Pan-STARRS (optical)" },
-  { id: "CDS/P/DSS2/color", label: "DSS2 (optical)" },
+  { id: "allwise", label: "AllWISE (3.4–22 µm)",
+    urls: ["https://alasky.cds.unistra.fr/AllWISE/RGB-W4-W2-W1", "https://alaskybis.cds.unistra.fr/AllWISE/RGB-W4-W2-W1"] },
+  { id: "2mass", label: "2MASS (1.2–2.2 µm)",
+    urls: ["https://alasky.cds.unistra.fr/2MASS/Color", "https://alaskybis.cds.unistra.fr/2MASS/Color"] },
+  { id: "panstarrs", label: "Pan-STARRS (optical)",
+    urls: ["https://alasky.cds.unistra.fr/Pan-STARRS/DR1/color-z-zg-g", "https://alaskybis.cds.unistra.fr/Pan-STARRS/DR1/color-z-zg-g"] },
+  { id: "dss2", label: "DSS2 (optical)",
+    urls: ["https://alasky.cds.unistra.fr/DSS/DSSColor", "https://alaskybis.cds.unistra.fr/DSS/DSSColor", "https://casda.csiro.au/hips/DSS2/color"] },
 ];
 
-let aladinPromise = null;
+/** First mirror whose HiPS description answers, so an outage at one host doesn't leave a grey map. */
+async function reachableMirror(urls) {
+  for (const url of urls) {
+    try {
+      const r = await fetch(`${url}/properties`, { signal: AbortSignal.timeout(6000) });
+      if (r.ok && /hips_|obs_title/.test(await r.text())) return url;
+    } catch { /* unreachable or blocked; try the next mirror */ }
+  }
+  return null;
+}
 
-export function aladinView(selector, { ra, dec, fovDeg, survey }) {
+let aladinPromise = null;
+let A = null;
+
+/** Show the field in a survey; resolves to the mirror's host, rejects if no mirror answers. */
+export async function aladinView(selector, { ra, dec, fovDeg, survey }) {
+  const spec = SURVEYS.find((s) => s.id === survey) || SURVEYS[0];
+  const url = await reachableMirror(spec.urls);
+  if (!url) throw new Error(`${spec.label} images are unavailable right now (survey servers not responding); try another survey or come back later`);
   // The npm build is an ES module exporting A (it does not set window.A); load it on first use.
-  aladinPromise ??= import(ALADIN_SRC).then(async ({ default: A }) => {
+  aladinPromise ??= import(ALADIN_SRC).then(async (mod) => {
+    A = mod.default;
     await A.init;
     return A.aladin(selector, {
-      survey, fov: fovDeg, target: `${ra} ${dec}`, cooFrame: "ICRS",
+      survey: url, fov: fovDeg, target: `${ra} ${dec}`, cooFrame: "ICRS",
       showReticle: true, showZoomControl: true, showLayersControl: false, showGotoControl: false,
       showFullscreenControl: true, showProjectionControl: false, showCooGridControl: false,
       showSimbadPointerControl: false, showShareControl: false, showFrame: false, showCooLocation: true,
     });
   });
   aladinPromise.catch(() => { aladinPromise = null; });
-  return aladinPromise.then((aladin) => {
-    aladin.gotoRaDec(ra, dec);
-    aladin.setFoV(fovDeg);
-    aladin.setImageSurvey(survey);
-    return aladin;
-  });
+  const aladin = await aladinPromise;
+  aladin.gotoRaDec(ra, dec);
+  aladin.setFoV(fovDeg);
+  aladin.setBaseImageLayer(A.imageHiPS(url, { name: spec.label }));
+  return new URL(url).host;
 }
