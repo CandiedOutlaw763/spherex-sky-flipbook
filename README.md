@@ -13,6 +13,14 @@ brightness histories on the fly and overlays stars from the Gaia and WISE missio
 | **Source code** | <https://github.com/CandiedOutlaw763/spherex-sky-flipbook> |
 | **Full user guide** | [docs/USER_GUIDE.md](docs/USER_GUIDE.md) |
 
+![The flipbook playing every SPHEREx image of Barnard's Star](docs/images/app-barnard.png)
+
+| Subtracting frames reveals motion | Brown dwarf Epsilon Indi B with Gaia stars | WISE 0855, the coldest known brown dwarf |
+|---|---|---|
+| ![Barnard's Star as a bright/dark pair in the difference view](docs/images/barnard-difference.png) | ![Epsilon Indi B glowing red with Gaia DR3 markers](docs/images/epsindib-gaia.png) | ![WISE 0855 as a faint red dot inside the reticle](docs/images/wise0855.png) |
+
+![Spectrum and brightness-over-time charts for Epsilon Indi B](docs/images/epsindib-charts.png)
+
 ## Contents
 
 1. [The challenge](#the-challenge)
